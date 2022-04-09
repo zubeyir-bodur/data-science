@@ -1,0 +1,690 @@
+---
+title: <center> Dodgers Promotion Project <h4> Spring 2022 </h4> <h2>GE 461 Introduction to Data Science - Project 1</h2> </center>
+pagetitle: Dodgers Promotion Project - GE 461 Project 1
+papersize: a4paper
+author: <center> Zübeyir Bodur - 21702382 </center>
+date: <center><h4>`r Sys.Date()`</h4></center>
+always_allow_html: true
+linkcolor: red
+output: 
+  bookdown::html_document2:
+    theme: readable
+    number_sections: true
+    code_folding: "hide"
+    toc: true
+  bookdown::pdf_document2:
+    number_sections: true
+bibliography: GE461.bib
+link-citations: yes
+---
+<style type="text/css">
+
+h1 { /* Header 1 */
+  font-size: 28px;
+}
+h2 { /* Header 2 */
+    font-size: 22px;
+}
+h3 { /* Header 3 */
+  font-size: 18px;
+}
+code.r{ /* Code block */
+    font-size: 12px;
+}
+pre { /* Code block - determines code spacing between lines */
+    font-size: 14px;
+}
+</style>
+
+
+```{r setup, include=FALSE}
+library(magrittr)
+library(tidyverse)
+library(car)
+library(caret)
+library(knitr)
+library(kableExtra)
+library(dplyr)
+library(pander)
+library(RSQLite)
+opts_chunk$set(echo = TRUE)
+
+options(knitr.kable.NA =".") 
+kable_format <- if (is_html_output()) "html" else "latex"
+options(scipen = 999)
+```
+
+# Executive Summary
+Bobblehead promotions were a great success and help increasing the number of attendants by appx. % 20. In a typical scenario, where the game is played on June, in Wednesday and in a room temperature, we can say with a 90 % confidence that number of attendants will be between appx. 40000 and 56000 (all tickets sold).
+
+However, our prediction is affected by which team the game was played against, as opponents were not included in our linear model.
+
+In addition, I recommend extending T-shirt promotions, as they were also promising but were run only 3 times, and it might be useful to run it a few more times to make a good decision.
+
+# Introduction
+In the dataset that was given to me, I observe that:
+
+* There are 81 games played
+* 6 opponents were mostly played against
+* Cap and T-shirt promotions were run only 2 and 3 times, respectively
+* Bobblehead promotions were run 14 times, and there were fireworks present 11 times
+* Days were mostly cloudy, and games were played at night most of the time
+  
+```{r}
+# Ctrl-shift-i
+con <- dbConnect(SQLite(), "data/dodgers.sqlite") 
+tbl(con, "events") %>%
+  collect() %>% 
+  mutate(day_of_week = factor(day_of_week, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")),
+         month = factor(month, levels = c("APR","MAY","JUN","JUL","AUG","SEP","OCT")),
+         day = factor(day, levels = c("1","2","3","4","5","6","7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31"))) %>% 
+  mutate_if(is.character, factor) %>% 
+  mutate(temp = round((temp - 32)*5/9)) -> events
+
+summary(events)
+```
+
+  In the explorary data analysis step below, we will analyze which of the variables given to us have effect on number of attendants, and based on these variables, we will make a linear regression to estimate the effect of bobblehead promotions.
+
+# Results
+
+## Exploratory Data Analysis
+
+Below, I have made the exploratory analysis of the events data of the Dodgers Baseball Team. The variables `month`, `day_of_week`, `temperature` were examined by Prof. Savaş Dayanık, and found to have statistical effect on attendance @savasge461[]. However, the variables, `skies` (whether there were clouds or not during the match), `day_night` were also examined by Dayanık, and were found to have no statistical effect on attendance.
+
+Therefore, in this section, I have examined the following variables; `opponent` , `cap` (whether cap promotions were made), `shirt` (whether shirt promotions were made), `fireworks` (whether fireworks were present), whether or not they should be included in linear model for examining our main independent variable, `bobblehead`.
+
+The main reason for this is that we are not sure if examining solely bobblehead promotion without taking other promotions and other variables that were not explored into account is risky, which I wanted to avoid.
+
+@. What are the number of plays against each opponent? If necessary, check the attendance data for the opponents being played against.
+
+Below is the full list of opponents Dodgers played a game against so far:
+```{r}
+levels(events$opponent)
+
+```
+
+Now, we plot total and mean attendances of those games, where Dodgers plays against each opponent team.
+```{r ggplot_means, fig.cap = "Barplot of mean of attendances versus opponents"}
+events %>% 
+  select(opponent, attend) -> events_opponent
+events_opponent <- transform(events_opponent, attend = as.integer(attend))
+events_opponent_sum <- events_opponent %>%
+  group_by(opponent) %>%
+  summarize(mean_attend = mean(attend),
+            sum_attend = sum(attend), .groups = "drop")
+
+ggplot_means <- events_opponent_sum %>%
+  ggplot(aes(opponent, mean_attend, fill=mean_attend)) +   
+  geom_bar(position="dodge",stat="identity", width=0.75, )  + 
+  theme(legend.position="none")
+ggplot_means
+```
+It can be observed that average number of attendants vary with different opponents, where peaks occurring in Angels, Mets, Nationals, and White Sox. However, there are no linear relation between opponents and the means of attendances. Therefore, we will create a jitter plot, and try to fit the dots into a curve:
+
+```{r ggplot_opponenets_scatter, fig.cap="Scatter plot with attendences versus opponents"}
+ggplot_means_box <- events %>%
+  ggplot(aes(x=opponent, y=attend)) +
+  geom_jitter()
+ggplot_means_box
+```
+
+Now, in order to fit this into a curve, we will map the opponents into an integer, such that least alphabetically ordered opponent will have a value of 1, and the highest will have a value of 17 (# of opponents).
+
+```{r}
+ggplot_means_box <- events_opponent %>% 
+  mutate(opponent = as.integer(opponent)) %>%
+  ggplot(aes(x=opponent, y=attend)) +
+  geom_jitter() +
+  geom_smooth(se = FALSE, method = 'loess',  formula = y ~ x)
+ggplot_means_box
+```
+
+Our initial guess can be that there could be a statistical relation between opponents played and attendance. However, we can not perform a Welch t-test to check this, but we can conclude that playing against at least the following teams increase the number of attendants:
+
+* Angels
+* Mets
+* Nationals
+* White Sox
+  
+However, at the moment, I am unable to construct a relation between those specific opponents and attendance.
+
+@. Does the `day` (the day of month) have a statistical significance with number of attendants?
+```{r ggplot_means_day, fig.cap = "Barplot of mean of attendances versus day of the month"}
+events %>% 
+  select(day, attend) -> events_day
+events_day_sum <- events_day %>%
+  group_by(day) %>%
+  summarize(mean_attend = mean(attend),
+            sum_attend = sum(attend), .groups = "drop")
+
+ggplot_means_day <- events_day_sum %>%
+  ggplot(aes(day, mean_attend, fill=mean_attend)) + geom_bar(position="dodge", stat="identity", width=0.75, )+theme(legend.position="none")
+ggplot_means_day
+```
+
+We can also provide a scatter plot, like previous:
+
+
+```{r ggplot_my, fig.cap="Figure caption here"}
+ggplot_my <- events_day %>% 
+  mutate(day = as.integer(day) ) %>%
+  ggplot(aes(day, y=attend)) +
+  geom_jitter() + 
+  geom_smooth(se = FALSE, method = 'loess',  formula = y ~ x)
+ggplot_my
+```
+From the curve above, I observe that there are no relation between day of month and number of attendants.
+
+@. Which of the promotions were given in total? Were promotions given separately, or were there games multiple promotions were given at the same time?
+
+```{r}
+events %>% 
+  count(bobblehead, fireworks, shirt, cap) %>%
+  pander(caption="")
+```
+We observe that no promotion were given simultaneosuly. Therefore, we will not take other promotions into account while performing our linear regression. However, it is still unknown, and in my opinion is statistically effective, whether other promotions effect the number of attendants. Therefore, for further suggestions, the effect of other promotions can be considered.
+
+Hence, to analyze the effect of bobblehead without any noise, we will clean our data so that we check 62 games, 51 of which no promotions were present, and 11 of which only bobblehead was present.
+```{r events_bobblehead, fig.cap="The cleaned data that will be used for linear regression"}
+events %>%
+  subset(bobblehead=="YES" & fireworks=="NO" & shirt=="NO" & cap=="NO" | bobblehead=="NO" & fireworks=="NO" & shirt=="NO" & cap == "NO" ) -> events_bobblehead
+events_bobblehead
+
+ggplot_bb <- events_bobblehead %>% 
+  ggplot(aes(bobblehead, y=attend)) +
+  geom_boxplot()
+ggplot_bb
+```
+
+Obviously, this box plot shows that bobblehead promotions were success. However, we want to know by how much bobblehead promotions are effective, which we will analyze in the linear regression part.
+
+We can also perform Welch t-test:
+
+```{r}
+t.test(x=events_bobblehead$attend[events_bobblehead$bobblehead=="YES"],
+       y=events_bobblehead$attend[events_bobblehead$bobblehead=="NO"])
+```
+Therefore, we have proved that bobblehead promotions are success, as the p-value in Welch t-test is smaller than 5 %. Moreover, we can make a rough estimation of the effect of the bobblehead, by dividing mean of x into mean of y; giving us `1.391181`. We can tell that bobblehead promotions were "around" 39 % effective on increasing the number of attendants. However, we can not tell if the true rate is above this number or below this number yet.
+
+
+@. Consider the games where only:
+  * Cap
+  * T-shirt
+  * Fireworks
+  
+promotions were present versus no promotions were present. Can we check whether they are statistical significant in this cases?
+
+As also stated in the previous section, I shall examine the each variable by plotting their boxplot with respect to their own cases, and perform Welch t-test for each.
+
+```{r}
+events %>%
+  subset(bobblehead=="NO" & fireworks=="YES" & shirt=="NO" & cap=="NO" | bobblehead=="NO" & fireworks=="NO" & shirt=="NO" & cap == "NO" ) -> events_fireworks
+
+ggplot_fw <- events_fireworks %>% 
+  ggplot(aes(fireworks, y=attend)) +
+  geom_boxplot()
+ggplot_fw
+
+t.test(x=events_fireworks$attend[events_fireworks$fireworks=="YES"],
+       y=events_fireworks$attend[events_fireworks$fireworks=="NO"])
+
+events %>%
+  subset(bobblehead=="NO" & fireworks=="NO" & shirt=="YES" & cap=="NO" | bobblehead=="NO" & fireworks=="NO" & shirt=="NO" & cap == "NO" ) -> events_shirt
+
+ggplot_sh <- events_shirt %>% 
+  ggplot(aes(shirt, y=attend)) +
+  geom_boxplot()
+ggplot_sh
+
+t.test(x=events_shirt$attend[events_shirt$shirt=="YES"],
+       y=events_shirt$attend[events_shirt$shirt=="NO"])
+
+events %>%
+  subset(bobblehead=="NO" & fireworks=="NO" & shirt=="NO" & cap=="YES" | bobblehead=="NO" & fireworks=="NO" & shirt=="NO" & cap == "NO" ) -> events_cap
+
+ggplot_cp <- events_cap %>% 
+  ggplot(aes(cap, y=attend)) +
+  geom_boxplot()
+ggplot_cp
+
+t.test(x=events_cap$attend[events_cap$cap=="YES"],
+       y=events_cap$attend[events_cap$cap=="NO"])
+
+```
+
+From the Welch t-tests, I observe that all of the 3 p-values are above 5 %, even though the boxplots show some increase in the favor of some promotions. Therefore, we can not reject the null hypothesis, that the differences between the true means of the two sub groups (YES and NO for each promotion) is zero. Therefore, our data currently tells us that only bobblehead promotions were effective for increasing the number of attendants.
+
+However, for T-shirt promotions, it must be noted that our sample size is too small; this promotion was run only 2 times, and its p-value is between 5 % and 10 %. In order to make a good decision about this, I recommend that the T-shirt promotions - as it has a much larger sample mean value - need to be run more, like 8-13 times more, to make a solid decision about their significance in attendance.
+
+## Linear Regression w.r.t Statistically Significant Variables
+In this section, I will regress attendance on `month`, `day of the week`, `temperature` and `bobblehead` promotion. For temperature, I will use the equation found by Dayanık, to construct a relation between attendance and temperature. However, I have changed the definition slightly to construct a linear model that approximates the "^" shape Dayanik plotted in the Appendix:
+
+$$
+temperature\_effect(\beta_1, \beta_2) = \beta_1 |temp-23| + \varepsilon_i
+$$
+$$
+attend(\beta) = \beta_0bobblehead_{YES} + temperature\_effect(\beta_1, \beta_2) + month\_effect(\beta) + week\_effect(\beta)
+$$
+
+But, before constructing the linear model, we will re-level the day and month values as follows, so that the first item in the levels is the beginning of the semesters and weeks in US:
+
+
+```{r}
+events_bobblehead_2 <- events_bobblehead %>% 
+  mutate(month = relevel(month, "JUN"),
+         day_of_week = relevel(day_of_week, "Sunday"))
+
+
+events_bobblehead_2$month %>% levels()
+events_bobblehead_2$day_of_week %>% levels()
+```
+
+Then, the summary of the linear model can be outputted as follows:
+
+```{r}
+linear_model <- lm(attend ~ month + day_of_week + abs(temp-23) + bobblehead, data = events_bobblehead_2) 
+linear_model %>% 
+  summary()
+```
+
+@. Is there any evidence for a relationship between attendance and other variables? Why or why not?
+
+By checking the p_value's of the predictors, we observe that there are relations between the following predictors and the attendance, as the p-values are smaller than 5 %:
+
+*  $bobblehead_{YES}$
+*  $|temp - 23|$
+*  $(week_{Monday})$
+*  $(week_{Wednesday})$
+*  $(month_{April})$
+*  $(month_{May})$
+
+@. Does the bobble head promotion have a statistically significant effect on the attendance?
+
+As explained in both exploratory data analysis section, and can be seen from the p-value (0.11 %), we can not reject null hypothesis, and therefore it has statistically significant effect on the attendance.
+
+@. Do the variables:
+
+* `month`
+* `day_of_week` 
+*  $|temp - 23|$
+
+help explain the number of attendants?
+
+To answer this question, we will subtract each variable from our linear model, and make an analysis of variance test on two models. If the p-value is smaller than 5 %, we will conclude that the subtracted variable is important.
+
+Prof. Dayanik's analysis of variance in the Appendix section already shows that `month` and `day_of_week` variables are important. We will check the temperature variables in this section.
+
+- ANOVA for $|temp - 23|$:
+
+```{r}
+linear_model_minus_abs <-update(linear_model, . ~ . - abs(temp-23) )
+anova(linear_model, linear_model_minus_abs)
+```
+
+We reject the null hypothesis for subtracting $|temp - 23|$ variable, since Analysis of Variance Table 1 tells us that true difference between variances is not zero, since the p-value is smaller than 5 %.
+
+Therefore, we conclude that the distance between the room temperature and the game temperature is an important variable in our model.
+
+@. How good does the model fit to the data? Why? Comment on residual standard error and $R^2$. Plot observed attendance against predicted attendance.
+
+In the current model, multiple $R^2$ value is $0.6714$. This means that although there are some errors, the model roughly fits. In addition, true $R^2$ can not be zero, since F-statistic's p-value is smaller than 5 %, therefore we reject the null hypothesis. But it does not mean that the current model is the best we can achieve, $1 - R^2$ value is not very small; the model is open to improvements.
+
+```{r}
+avPlots(linear_model)
+```
+
+@. Further cross validation
+
+
+```{r}
+# Define training control
+set.seed(123) 
+train.control <- trainControl(method = "cv", number = 5)
+
+# Train the model
+model <- train(attend ~ month + day_of_week + abs(temp - 23) + 
+    bobblehead, data = events_bobblehead, method = "lm",
+               trControl = train.control)
+# Results
+RMSE <- model$results$RMSE
+MAE <- model$results$MAE
+R_sqrd <- model$results$Rsquared
+
+# Summarize the results
+print(model)
+```
+We can ignore the warnings, as what R prints are the columns that we have already proved, which have proven to have no statistical significance w.r.t attendance.
+
+K-fold cross validation shows that our $R^2$ is `r model$results$Rsquared` %, supporting the argument above, that model is somewhat good but is open to improvements.
+
+
+@. Predict the number of attendees to a typical home game on a Wednesday in June if a bobble head promotion is extended or not extended, where the temperature is 23 degrees. Give a 90% prediction interval. Then give an estimation about the effect of bobblehead.
+
+```{r}
+p1 <- predict(linear_model, 
+        newdata = data.frame(
+          month = "JUN",
+          day_of_week = "Wednesday",
+          bobblehead = "YES", 
+          temp = 23),
+          interval = "prediction",
+        level = 0.90)
+
+p1
+
+p2 <- predict(linear_model, 
+        newdata = data.frame(
+          month = "JUN",
+          day_of_week = "Wednesday",
+          bobblehead = "NO", 
+          temp = 23),
+          interval = "prediction",
+        level = 0.90)
+
+p2
+```
+
+Our prediction shows that in such a scenario, we can guess with a 90 % confidence, that number of attendants will be between `r p1[2]` and `r p1[3]`, meaning the stadium could be full and all tickets could be sold in such a case, if bobblehead is extended.
+
+We compute the effect of bobblehead by dividing fit values as `r p1[1]` / `r p2[1]` = `r p1[1] / p2[1]`.
+
+# Conclusion
+To sum up, bobblehead promotions are a great success; we can increase the number of attendants by `r ((p1[1] / p2[1]) - 1) * 100` %. I also suggest extending T-shirt promotions, as they also show promising result with respect our small data about T-shirt promotions on our hand.
+
+In the explorary data analysis, we have found that attendance have significant relation with bobblehead promotions, along with the temperature, day of the week and day of the month. The opponent being played against could also be an important factor.
+
+In our linear model, I have found MSE and MAE values as `r model$results$RMSE`, and `r model$results$MAE`, respectively. $R^2$ was found as `r model$results$Rsquared`. Again, these values point out that our model can make rough estimations with some error involved. However, it can also be noted that this model is enough to meet our needs, that we can identify by how much percent bobblehead increase the number of attendants.
+
+For further improvements the following can be done:
+
+* Adjust the dataset and the model such that only
+  - $(week_{Monday})$
+  - $(week_{Wednesday})$
+  - $(month_{April})$
+  - $(month_{May})$
+  variables are considered, instead of the whole weekdays or months.
+* Adjust the dataset and the model so that
+  - Angels
+  - Mets
+  - Nationals
+  - White Sox
+
+teams are also one-hot encoded boolean variables so that the model can make a better estimation about the number of attendants.
+
+# Bibliography
+<div id="refs"></div>
+
+# Appendix
+
+## Exploratory Data Analysis
+Below is the work done by Prof. Savaş Dayanık, could be referred for more detailed information about the Dodgers data set.
+
+```{r}
+events %>% 
+  count(bobblehead, fireworks)
+```
+
+@. What are the number of plays on each week day and in each month of a year?
+
+Table \@ref(tab:monthweekday) and \@ref(fig:barweekdaymonth) summarize the number of games played on each weekday and month.
+
+```{r}
+events %>% 
+  count(day_of_week, month) %>% 
+  pivot_wider(names_from = day_of_week, values_from = n) %>% 
+  pander(caption = "(\\#tab:monthweekday) Number of games played in each weekday and month")
+```
+
+```{r barweekdaymonth, fig.cap = "Barplot of counts of games for each weekday and month"}
+events %>% 
+  ggplot(aes(day_of_week)) +
+  geom_bar(aes(fill=month))
+  
+```
+Figure \@ref(fig:heatmap) shows your friend's (very good) suggestion of heatmap of total attendance versus weekday and month. The colors change from bright yellow to dark red as attendance increases. Default heatmap shuffles rows and columns so as to bring together weekdays and months with similar attendance. Here we see May, Aug, and Jul together within the months and Saturday, Friday, Sunday within the weekdays. Learn more about xtabs (cross-table) heatmap by typing `?xtabs` and `?heatmap` in the R console.
+
+```{r heatmap, fig.cap = "Heatmap of attendance versus weekday and month."}
+xtabs(attend ~ day_of_week + month, events) %>% 
+  heatmap()
+```
+
+In Figure \@ref(fig:scatterattend), I have added one more aes (colour) to capture day_night information. To avoid overplotting, I replaced `geom_point()` with `geom_jitter()`. These plots were also illuminating. So let us thank your friend who suggested this one, too.
+
+```{r scatterattend, out.width="50%", fig.show="hold", fig.cap="Average and total attendances on each weekday and month in each part of day"}
+
+sum_attend <- events %>% 
+  group_by(day_of_week, month, day_night) %>% 
+  summarize(mean_attend = mean(attend),
+            total_attend = sum(attend), .groups = "drop")
+
+sum_attend %>% 
+  ggplot(aes(day_of_week, month, month)) +
+  geom_jitter(aes(size = mean_attend, col = day_night), width = .1, height = .1, alpha=0.7) +
+  scale_size(labels = scales::comma) +
+  labs(title = "Average attendance", size = "attendance", col = "part of day",
+       x = "Weekday", y = "Month")
+
+sum_attend %>% 
+  ggplot(aes(day_of_week, month)) +
+  geom_jitter(aes(size = total_attend, col = day_night), width = .1, height = .1, alpha=0.7) +
+  labs(title = "Total attendance", size = "attendance", col = "part of day",
+       x = "Weekday", y = "Month") +
+  scale_size(labels = scales::comma) +
+  guides(col = guide_legend(order = 1), 
+         shape = guide_legend(order = 2))
+```
+
+
+@. Check the orders of the levels of the `day_of_week` and `month` factors. If necessary, put them in the logical order.
+
+```{r}
+levels(events$day_of_week)
+levels(events$month)
+```
+
+@. How many times were bobblehead promotions run on each week day?
+
+```{r}
+events %>% 
+  count(day_of_week, bobblehead) %>% 
+  pivot_wider(names_from = bobblehead, values_from = n) %>% 
+  replace_na(list(YES = 0)) %>% 
+  mutate(Total = YES + NO) %>% 
+  select(-NO) %>% 
+  rename(Bobblehead = YES)
+```
+
+
+@. How did the attendance vary across week days? Draw boxplots. On which day of week was the attendance the highest on average?
+
+```{r}
+events %>% 
+  ggplot(aes(day_of_week, attend)) +
+  geom_boxplot()
+```
+
+```{r}
+events %>% 
+  slice_max(order_by = attend, n=5)
+```
+
+
+@. Is there an association between attendance and 
+    - whether the game is played in day light or night? 
+    - Between attendance and whether skies are clear or cloudy?  
+
+```{r}
+events %>% 
+  ggplot(aes(day_night, attend)) +
+  geom_boxplot()
+```
+
+```{r}
+t.test(x=events$attend[events$day_night=="Day"],
+       y=events$attend[events$day_night=="Night"])
+```
+
+Since p-value (0.67) is large (greater than 0.05), we cannot reject null, which means there is no statistical difference between average attendance of games played in day and night.
+
+```{r}
+events %>% 
+  ggplot(aes(skies, attend)) +
+  geom_boxplot()
+```
+
+```{r}
+t.test(x=events$attend[events$skies=="Clear"],
+       y=events$attend[events$skies=="Cloudy"])
+```
+
+We do not see a statisticall significant difference between the average attendance of the games played under clear and cloudy skies.
+  
+@. Is there an association between attendance and temperature? 
+    - If yes, is there a positive or negative association? 
+    - Do the associations differ on clear and cloud days or day or night times? 
+
+```{r}
+events %>% 
+  ggplot(aes(temp, attend)) +
+  geom_jitter() +
+  geom_smooth(se = FALSE)
+```
+
+$$
+attend = \beta_0 + \beta_1 temp + \beta_2 (temp - 23)^+ + \varepsilon_i
+$$
+
+```{r}
+lm(attend ~ temp + pmax(0, temp - 23), data = events) %>% summary()
+```
+
+```{r, eval =FALSE, echo=FALSE}
+x <- sample(1:100, 10)
+y <- sample(1:100, 10)
+cbind(x,y)
+pmax(x,y)
+```
+
+$$
+attend = \beta_0 + \beta_1 temp + \beta_2 (temp-23)^+ + \varepsilon_i
+$$
+
+```{r}
+events %>% 
+  ggplot(aes(temp, attend)) +
+  geom_jitter() +
+  geom_smooth(se = FALSE) +
+  geom_smooth(se = FALSE, method = "lm", 
+              formula = y ~ x + pmax(x-23,0), col = "red") 
+```
+
+There is statistically significant relation between attendance and temperature.
+    
+\clearpage
+## Next time: A linear regression model
+
+Regress attendance on `month`, `day of the week`, and `bobblehead` promotion.
+
+```{r}
+lmod1 <- lm(attend ~ month + day_of_week + bobblehead, data = events)
+events$month %>% levels()
+
+events2 <- events %>% 
+  mutate(month = relevel(month, "JUN"),
+         day_of_week = relevel(day_of_week, "Sunday"))
+events2$month %>% levels()
+events2$day_of_week %>% levels()
+lm(attend ~ month + day_of_week + bobblehead, data = events2) %>% summary()
+
+```
+
+
+@. Is there any evidence for a relationship between attendance and other variables? Why or why not?
+
+```{r}
+lmod1 %>% summary()
+```
+
+Check F-statistic's p-value. If it is less than 0.05, then there is relation between attendance and predictors.
+    
+@. Does the `bobblehead` promotion have a statistically significant effect on the attendance?
+
+Test $H_0: \beta_\text{BobbleheadYES} = 0$. Under $H_0$, t-stat in the summary has t-distribution with degrees of freedom equal to (number of samples - numbr of parameters estimated). We check directly p-value for the t-test. If p-value is small (< 0.05), then we reject the null hypothesis and conclude that BobbleHead is important in increasing the attendance in the games. Since p-value (0.0000359) is less than 5%, we reject the null. Therefore we conclude it is a good idea to use bobblehead to boos the number of fans coming to stadium to watch the game.
+
+@. Do `month` and `day of week` variables help to explain the number of attendants?
+
+Is there a relation between month and attendance (after we account for the effects of day_of_week and bobblehead)?
+
+```{r}
+# lmod2 <- lm(attend ~ skies, data = events)
+# lmod2 %>% summary()
+# lmod2 <- lm(attend ~month, data = events)
+# lmod2 %>% summary()
+small <- update(lmod1, . ~ . - month)
+anova(small, lmod1)
+```
+
+H_0: the small model is correct. If p-value is small (for example, less than 5%), as always we reject the null hypothesis (in this case, null says that the small model is correct). Here, p-value = 01858 < 5%, so it is small. We reject the small model. Therefore, we conclude that month and attendance are related (while day_of_week and bobbleheadYES are still in the model).
+    
+@. How many fans are expected to be drawn alone by a bobblehead promotion to a home game? Give a 90\% confidence interval.
+      
+@. How good does the model fit to the data? Why? Comment on residual standard error and R$^2$. Plot observed attendance against predicted attendance. 
+
+Is day of week important? (Does day_of_week provide new explanation while the other predictors are still present in the model?)
+
+```{r}
+small <- update(lmod1, . ~ . - day_of_week) 
+anova(small, lmod1)
+```
+
+We reject the small model because p-value (0.02704) is small (less than 0.05). SO conclude that day of week still contributes important information to pur understanding of attandance while the others two predcitors are in the model.
+
+Variable selection
+
+```{r}
+smallest <- update(lmod1, . ~ . - day_of_week - month)
+anova(smallest, small, lmod1)
+```
+
+```{r}
+small
+small2 <- update(lmod1, . ~ . - month)
+anova(smallest, small2, lmod1)
+```
+
+
+```{r}
+anova(smallest, lmod1)
+```
+
+* It is wise to compare all nested models pairwise with anova()
+* If p-value is slightly above 5%, we may call anova to be inconclusive. Use cross-validation to decide between two models:
+
+  - For cross-validation:
+    - Split the data into folds (say 10 for large data, 5 or small for small data; here I would have taken 5)
+    - For each of five folds
+      * Remove the test fold
+      * Train all models that you want to compare on the remaining four folds combined.
+      * Test all models on the held-out fold
+        - Calculate MSE, MAE
+    - Take average of performance measures (MSE, MAE) across all ftest folds.
+    - Pick the model which has the most favorable performance measures.
+
+@. Predict the number of attendees to a typical home game on a Wednesday in June if a bobblehead promotion is extended. Give a 90% prediction interval.
+
+We will use the full model because anova analysis showed that all predictors were important
+
+```{r}
+predict(lmod1, 
+        newdata = data.frame(
+          month = "JUN",
+          day_of_week = "Wednesday",
+          bobblehead = "YES"),
+          interval = "prediction",
+        level = 0.90)
+```
+
+
+
+
