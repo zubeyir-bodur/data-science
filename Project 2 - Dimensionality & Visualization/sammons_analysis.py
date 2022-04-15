@@ -1,5 +1,4 @@
-import defs
-import sammon
+from sammon import *
 
 
 def main():

@@ -1,4 +1,4 @@
-import defs
+from defs import *
 
 
 def main():
