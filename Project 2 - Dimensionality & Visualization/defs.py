@@ -9,8 +9,8 @@ DIM = len(DIGITS[0])
 WIDTH = int(math.sqrt(DIM))
 HEIGHT = DIM // WIDTH
 SIZE = len(DIGITS)
-DISP_WIDTH = 10
-DISP_HEIGHT = 12
+DISP_WIDTH = 11
+DISP_HEIGHT = 19
 TRAIN_SIZE = SIZE // 2
 
 
@@ -49,7 +49,7 @@ def pack(vector):
 
 def squash(vector):
     """
-    Given a MINST handwritten digit vector ranging from [0,1]
+    Given a MINST handwritten digit vector, can be negative or positive
     Return a 20x20 grayscale image that can be displayed in Python
     :param vector:
     :return:
@@ -77,11 +77,19 @@ def split(dataset=DIGITS, labels=LABELS):
     perm = np.random.permutation(SIZE)
     train_idx = perm[0:SIZE//2]
     test_idx = perm[SIZE//2:SIZE]
-    train_data = dataset[train_idx]
-    test_data = dataset[test_idx]
     train_idx = np.sort(train_idx)
     test_idx = np.sort(test_idx)
+    train_data = dataset[train_idx]
+    test_data = dataset[test_idx]
     train_label = labels[train_idx]
     test_label = labels[test_idx]
     return train_data, test_data, train_label, test_label
 
+
+def partition(digits, labels):
+    partitioned = []
+    for i in range(10):
+        partitioned.append([])
+    for j in range(len(digits)):
+        partitioned[int(labels[j])].append(digits[j])
+    return partitioned

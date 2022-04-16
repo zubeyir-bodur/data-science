@@ -45,8 +45,6 @@ def main():
     # TODO: Plot the classification error vs Num components used
     return
 
-    return
-
 
 if __name__ == "__main__":
     main()
