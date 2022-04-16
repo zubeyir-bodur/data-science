@@ -1,7 +1,7 @@
 import numpy as np
 import math
 from scipy.io import loadmat
-
+import matplotlib.pyplot as plt
 
 DIGITS = loadmat('digits.mat')['digits']
 LABELS = loadmat('digits.mat')['labels']
@@ -102,3 +102,15 @@ def partition(digits, labels):
     for j in range(len(digits)):
         partitioned[int(labels[j])].append(digits[j])
     return partitioned
+
+
+def plot_scatter(y, labels, mode):
+    for i in range(10):
+        plt.scatter(y[labels == i, 0], y[labels == i, 1], s=20, c='r', marker='o', label=i)
+    if mode == "tsne":
+        plt.title('t-SNE Visualization of MNIST Handwritten Digit Dataset')
+    elif mode == "sammon":
+        plt.title('Sammon\'s Mapping of MNIST Handwritten Digit Dataset')
+    plt.legend(loc=2)
+    plt.show()
+    return
