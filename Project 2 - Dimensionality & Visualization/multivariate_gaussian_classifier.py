@@ -108,18 +108,6 @@ class MultivariateGaussianClassifier:
         self.dim = 0
 
 
-def multivariate_normal_distribution(x, d, mean, covariance):
-    """pdf of the multivariate normal distribution.
-    source: https://peterroelants.github.io/posts/multivariate-normal-primer/
-    Not used
-    """
-    x_m = x - mean
-    covariance_inverse = np.linalg.inv(covariance)
-    x_m_transpose = np.transpose(x_m)
-    return (1. / (np.sqrt((2 * np.pi)**d * np.linalg.det(covariance)))) *\
-        np.exp(-(np.matmul(np.matmul(x_m_transpose, covariance_inverse), x_m)) / 2)
-
-
 def classification_error(predict_labels, test_labels):
     conf_matrix = confusion_matrix(predict_labels=predict_labels,
                                    test_labels=test_labels)

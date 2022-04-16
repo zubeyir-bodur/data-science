@@ -54,14 +54,13 @@ def main():
     Image.fromarray(mean_img).show()
     """
 
-
     # Display top 205 eigenvectors
     eigen_digits = display_blocks(eigenvectors, code="eig")
     Image.fromarray(eigen_digits).show()
 
-
     # Train a Gaussian classifier for each subspace
-    classification_errors = []
+    classification_errors_test = []
+    classification_errors_train = []
     num_components = []
     for i in range(40):
         # Project the training data and test data to those subspaces
@@ -78,15 +77,29 @@ def main():
         # Test the classifier
         predictions = classifier.predict(test_digits=subspace_test)
 
-        # Gather results
-        classification_errors.append(
+        # Gather results - on the test data
+        classification_errors_test.append(
             classification_error(predict_labels=predictions,
                                  test_labels=test_label))
 
-    # Plot the classification error vs Num components used
+        # Gather results - on the train data
+        predictions = classifier.predict(test_digits=subspace_train)
+        classification_errors_train.append(
+            classification_error(predict_labels=predictions,
+                                 test_labels=train_label))
+
+    # Plot the classification error vs Num components used - test data
     figure(figsize=(8, 6), dpi=300)
-    plt.plot(num_components, classification_errors)
-    plt.title("Classification Error Plot for Principal Component Analysis")
+    plt.plot(num_components, classification_errors_test)
+    plt.title("Classification Error Plot for PCA - Test Set")
+    plt.xlabel("# of First PCA Components Used")
+    plt.ylabel("Classification Error (%)")
+    plt.show()
+
+    # Plot the classification error vs Num components used - train data
+    figure(figsize=(8, 6), dpi=300)
+    plt.plot(num_components, classification_errors_train)
+    plt.title("Classification Error Plot for PCA - Training Set")
     plt.xlabel("# of First PCA Components Used")
     plt.ylabel("Classification Error (%)")
     plt.show()

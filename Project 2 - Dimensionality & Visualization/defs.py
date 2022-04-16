@@ -14,14 +14,19 @@ DISP_HEIGHT = 19
 TRAIN_SIZE = SIZE // 2
 
 
-def display_blocks(eigenvectors, disp_rows=DISP_WIDTH, disp_cols=DISP_HEIGHT, code="mnist"):
+def display_blocks(eigenvectors,
+                   disp_rows=DISP_WIDTH,
+                   disp_cols=DISP_HEIGHT,
+                   ind_img_height=HEIGHT,
+                   ind_img_width=WIDTH,
+                   code="mnist"):
     """
     Given a set of images (eigenvectors), returns the merged image
     that will be displayed in PIL, where the top left image will be the
     first image, bottom right image will be the last
     :return: A 2D numpy array
     """
-    out = np.zeros((disp_rows * HEIGHT, disp_cols * WIDTH), dtype=float)
+    out = np.zeros((disp_rows * ind_img_height, disp_cols * ind_img_width), dtype=float)
     for a in range(disp_rows):
         for b in range(disp_cols):
             if (disp_cols*a + b) < len(eigenvectors):
@@ -29,8 +34,10 @@ def display_blocks(eigenvectors, disp_rows=DISP_WIDTH, disp_cols=DISP_HEIGHT, co
                 if code == "mnist":
                     I = pack(eigenvectors[disp_cols*a + b])
                 elif code == "eig":
-                    I = squash(eigenvectors[:, disp_cols*a + b])
-                out[HEIGHT * a: HEIGHT*(a+1), WIDTH * b: WIDTH*(b+1)] = I
+                    I = squash(eigenvectors[:, disp_cols*a + b], ind_img_height, ind_img_width)
+                elif code == "lda":
+                    I = squash(eigenvectors[disp_cols * a + b, :], ind_img_height, ind_img_width)
+                out[ind_img_height * a: ind_img_height*(a+1), ind_img_width * b: ind_img_width*(b+1)] = I
     return out
 
 
@@ -47,14 +54,16 @@ def pack(vector):
     return np.array(temp * 255, dtype=float)
 
 
-def squash(vector):
+def squash(vector, ind_img_height=20, ind_img_width=20):
     """
-    Given a MINST handwritten digit vector, can be negative or positive
+    Given a MINST handwritten digit vector, can be negative or positive, can have any dimensions
     Return a 20x20 grayscale image that can be displayed in Python
+    :param ind_img_height:
+    :param ind_img_width:
     :param vector:
     :return:
     """
-    temp = np.reshape(vector, (20, 20))
+    temp = np.reshape(vector, (ind_img_height, ind_img_width))
     # Transpose, for Python only
     temp = np.transpose(temp)
     maximum = np.amax(temp)
@@ -83,7 +92,7 @@ def split(dataset=DIGITS, labels=LABELS):
     test_data = dataset[test_idx]
     train_label = labels[train_idx]
     test_label = labels[test_idx]
-    return train_data, test_data, train_label, test_label
+    return train_data, test_data, train_label.flatten(), test_label.flatten()
 
 
 def partition(digits, labels):
