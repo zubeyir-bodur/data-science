@@ -3,12 +3,16 @@ import matplotlib.pyplot as plt
 from sklearn import datasets
 from sklearn import metrics
 
+"""
+source: https://github.com/RobinKarlsson/Sammon-Mapping
+"""
+
 
 def C(distances):
     c = 0
     for i in range(distances.shape[0]):
         for j in range(distances.shape[0]):
-            if (i < j):
+            if i < j:
                 c += distances[i, j]
 
     return c
@@ -18,7 +22,7 @@ def sammonStress(in_distances, out_distances, c):
     E = 0
     for i in range(in_distances.shape[0]):
         for j in range(in_distances.shape[0]):
-            if (i < j):
+            if i < j:
                 E += ((out_distances[i, j] - in_distances[i, j]) ** 2) / in_distances[i, j]
     return E / c
 
@@ -64,8 +68,8 @@ def sammon(X, max_iter=500, epsilon=1e-7, alpha=0.3):
 
                     partial_der1 = partial_der1 + np.multiply(difference / denominator, y_difference)
                     partial_der2 = partial_der2 + (1 / denominator) * (
-                                difference - np.divide(np.square(y_difference), in_distances[i, j]) * (
-                                    1 + difference / in_distances[i, j]))
+                            difference - np.divide(np.square(y_difference), in_distances[i, j]) * (
+                            1 + difference / in_distances[i, j]))
 
             partial_der1 = (-2 / c) * partial_der1
             partial_der2 = (-2 / c) * partial_der2

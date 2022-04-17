@@ -1,7 +1,9 @@
 import numpy as np
 from scipy.spatial.distance import cdist
 from cmdscale import cmdscale
-
+"""
+source: https://github.com/tompollard/sammon
+"""
 
 def sammon(x, n, display=2, inputdist='raw', maxhalves=20, maxiter=500, tolfun=1e-9, init='default'):
     """
