@@ -25,7 +25,7 @@ def sammon(x, n, display=2, inputdist='raw', maxhalves=20, maxiter=500, tolfun=1
        display        - 0 to 2. 0 least verbose, 2 max verbose.
        init           - {'pca', 'cmdscale', random', 'default'}
                         default is 'pca' if input is 'raw', 
-                        'msdcale' if input is 'distance'
+                        'cmsdcale' if input is 'distance'
     The default options are retrieved by calling sammon(x) with no
     parameters.
     File        : sammon.py

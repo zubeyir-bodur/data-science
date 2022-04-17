@@ -3,13 +3,17 @@ from sklearn.manifold import TSNE
 
 
 def main():
-
+    labels = LABELS.ravel()
     # Run t-SNE to map the dataset into two dimensions
     digits_embedded = TSNE(n_components=2,
-                           learning_rate='auto',
-                           init='random').fit_transform(X=DIGITS, y=LABELS)
+                           perplexity=50.0,
+                           early_exaggeration=30.0,
+                           n_iter=10000,
+                           learning_rate=30.0,
+                           metric='manhattan',
+                           init='pca').fit_transform(X=DIGITS, y=labels)
     # Plot the image space WITH their class information
-    plot_scatter(digits_embedded, LABELS, "tsne")
+    plot_scatter(digits_embedded, labels, "tsne")
     return
 
 

@@ -2,6 +2,7 @@ import numpy as np
 import math
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
+import random
 
 DIGITS = loadmat('digits.mat')['digits']
 LABELS = loadmat('digits.mat')['labels']
@@ -105,8 +106,12 @@ def partition(digits, labels):
 
 
 def plot_scatter(y, labels, mode):
+    colors = ['#FF0000', '#00FF00', '#0000FF', '#F0F000',
+              '#00F0F0', '#F000F0', '#FFA500', '#FFC0CB',
+              '#000000', '#851E1E']
+    plt.figure(figsize=(8, 6), dpi=300)
     for i in range(10):
-        plt.scatter(y[labels == i, 0], y[labels == i, 1], s=20, c='r', marker='o', label=i)
+        plt.scatter(y[labels == i, 0], y[labels == i, 1], s=1.5, c=colors[i], marker='o', label=i)
     if mode == "tsne":
         plt.title('t-SNE Visualization of MNIST Handwritten Digit Dataset')
     elif mode == "sammon":
