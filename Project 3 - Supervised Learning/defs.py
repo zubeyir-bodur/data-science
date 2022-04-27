@@ -1,7 +1,11 @@
+import operator
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 from random import random
+
+from scipy.interpolate import make_interp_spline
+from sklearn.preprocessing import MinMaxScaler
 
 
 def read_data():
@@ -28,7 +32,7 @@ def read_data():
             else:
                 x_test.append(x_)
                 y_test.append(y_)
-    return [x_train, y_train, x_test, y_test]
+    return [np.array(x_train), np.array(y_train), np.array(x_test), np.array(y_test)]
 
 
 def sigmoid(x):
@@ -62,3 +66,78 @@ def sigmoid_der(x):
 
 def random_weights(num_units):
     return np.array([random() for _ in range(num_units)])
+
+
+def min_max_scale(ndarray):
+    """
+    Min max normalization does not work...
+    :param ndarray:
+    :return:
+    """
+    scaler = MinMaxScaler()
+    transformed = scaler.fit_transform(np.transpose(ndarray.reshape(1, -1))).flatten()
+    return transformed, scaler
+
+
+def inverse_transform(transformed, scaler):
+    return scaler.inverse_transform(np.transpose(transformed.reshape(1, -1))).flatten()
+
+
+def uniques(array):
+    unique_indices = []
+    unique_values = []
+    for i in range(len(array)):
+        if array[i] not in unique_values:
+            unique_indices.append(i)
+            unique_values.append(array[i])
+    return np.array(unique_indices), np.array(unique_values)
+
+
+def plot_predictions(x, y, y_predictions, is_test, is_norm):
+    """
+    Given predictions and the test data
+    Pplot the predictions smoothly
+    so that they look just like a
+    polynomial regression
+    :param is_test:
+    :param x:
+    :param y:
+    :param y_predictions:
+    :return:
+    """
+    plt.figure(figsize=(10, 8), dpi=300)
+
+    # Smooth the predictions
+
+    # Get the unique x_test values
+    # So that smoothing works...
+    test_unique_indices, x_test_unique = uniques(x)
+    y_predict_unique = y_predictions[test_unique_indices]
+
+    # Enumerate the coordinate system and sort in ascending order
+    # Return the old indexes
+    enumerate_object_xtest = enumerate(x_test_unique)
+    sorted_pairs = sorted(enumerate_object_xtest, key=operator.itemgetter(1))
+    sorted_indices = [index for index, element in sorted_pairs]
+
+    # Find the sorted version of y_predict
+    x_test_sorted = x_test_unique[sorted_indices]
+    y_predict_sorted = y_predict_unique[sorted_indices]
+    x_test_sorted_new = np.linspace(x_test_sorted.min(), x_test_sorted.max(), 300)
+    spl = make_interp_spline(x_test_sorted, y_predict_sorted, k=3)  # type: BSpline
+    y_predict_sorted_smooth = spl(x_test_sorted_new)
+
+    if is_test:
+        plt.scatter(x=x, y=y, s=10, c='#FF0000')
+        plt.plot(x_test_sorted_new, y_predict_sorted_smooth, c='#FFA500')
+        plt.title(f"Scatter plot of the test values vs Predicted function is_norm={is_norm}")
+        plt.legend(labels=["Test data", "Predictions"])
+    else:
+        plt.scatter(x=x, y=y, s=10, c='#00FF00')
+        plt.plot(x_test_sorted_new, y_predict_sorted_smooth, c='#FFA500')
+        plt.title(f"Scatter plot of the training values vs Predicted function is_norm={is_norm}")
+        plt.legend(labels=["Training data", "Predictions"])
+    plt.ylabel("X axis")
+    plt.xlabel("Y axis")
+    plt.show()
+    return
