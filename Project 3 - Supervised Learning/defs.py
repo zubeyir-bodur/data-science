@@ -93,24 +93,14 @@ def uniques(array):
     return np.array(unique_indices), np.array(unique_values)
 
 
-def plot_predictions(x, y, y_predictions, is_test, is_norm):
+def smooth_predictions(x, y_predictions):
     """
-    Given predictions and the test data
-    Pplot the predictions smoothly
-    so that they look just like a
-    polynomial regression
-    :param is_test:
+    Smooth the predictions by normalizing points into 300 samples
     :param x:
-    :param y:
     :param y_predictions:
     :return:
     """
-    plt.figure(figsize=(10, 8), dpi=300)
-
-    # Smooth the predictions
-
     # Get the unique x_test values
-    # So that smoothing works...
     test_unique_indices, x_test_unique = uniques(x)
     y_predict_unique = y_predictions[test_unique_indices]
 
@@ -126,7 +116,24 @@ def plot_predictions(x, y, y_predictions, is_test, is_norm):
     x_test_sorted_new = np.linspace(x_test_sorted.min(), x_test_sorted.max(), 300)
     spl = make_interp_spline(x_test_sorted, y_predict_sorted, k=3)  # type: BSpline
     y_predict_sorted_smooth = spl(x_test_sorted_new)
+    return x_test_sorted_new, y_predict_sorted_smooth
 
+
+def plot_predictions(x, y, y_predictions, is_test, is_norm):
+    """
+    Given predictions and the test data
+    Plot the predictions smoothly
+    so that they look just like a
+    polynomial regression
+    :param is_norm:
+    :param is_test:
+    :param x:
+    :param y:
+    :param y_predictions:
+    :return:
+    """
+    plt.figure(figsize=(6, 4), dpi=120)
+    x_test_sorted_new, y_predict_sorted_smooth = smooth_predictions(x, y_predictions)
     if is_test:
         plt.scatter(x=x, y=y, s=10, c='#FF0000')
         plt.plot(x_test_sorted_new, y_predict_sorted_smooth, c='#FFA500')

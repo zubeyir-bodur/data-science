@@ -24,8 +24,12 @@ class ANN:
             # Initialize random weights
             self.weights = np.zeros(shape=(num_units, 2))
             # Weights = [w_xh, w_hy, wh]
-            self.weights[:, 0] = random_weights(num_units)
-            self.weights[:, 1] = random_weights(num_units)
+            if not self.is_normalized:
+                self.weights[:, 0] = random_weights(num_units)
+                self.weights[:, 1] = random_weights(num_units)
+            else:
+                self.weights[:, 0] = 1
+                self.weights[:, 1] = 1
             # Output emitted by the hidden units
             self.h = np.array([(1 / num_units) for _ in range(num_units)])
         else:
