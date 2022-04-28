@@ -1,11 +1,12 @@
+import io
 import operator
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 from random import random
-
 from scipy.interpolate import make_interp_spline
 from sklearn.preprocessing import MinMaxScaler
+from PIL import Image
 
 
 def read_data():
@@ -121,18 +122,19 @@ def smooth_predictions(x, y_predictions):
     return x_test_sorted_new, y_predict_sorted_smooth
 
 
-def plot_predictions(x, y, y_predictions, is_test, is_norm):
+def plot_predictions(x, y, y_predictions, is_test, is_norm, show=True):
     """
     Given predictions and the test data
     Plot the predictions smoothly
     so that they look just like a
     polynomial regression
+    :param show:
     :param is_norm:
     :param is_test:
     :param x:
     :param y:
     :param y_predictions:
-    :return:
+    :return: PIL object for the plot
     """
     plt.figure(figsize=(6, 4), dpi=120)
     x_test_sorted_new, y_predict_sorted_smooth = smooth_predictions(x, y_predictions)
@@ -148,5 +150,38 @@ def plot_predictions(x, y, y_predictions, is_test, is_norm):
         plt.legend(labels=["Training data", "Predictions"])
     plt.ylabel("X axis")
     plt.xlabel("Y axis")
-    plt.show()
-    return
+    if show:
+        plt.show()
+        return None
+    else:
+        img_buf = io.BytesIO()
+        plt.savefig(img_buf, format='png')
+        im = Image.open(img_buf)
+        im_matrix = np.array(im)
+        img_buf.close()
+        return im_matrix
+
+
+def display_blocks(plots,
+                   disp_rows=2,
+                   disp_cols=3):
+    """
+    Given a set of plots, combine them into a single image
+    assuming we have 5 plots.
+    """
+    plot_height = plots[0].shape[0]
+    plot_width = plots[0].shape[1]
+    channels = plots[0].shape[2]
+    out = np.zeros(shape=(plot_height * disp_rows, plot_width * disp_cols, channels), dtype=float)
+    for a in range(disp_rows):
+        for b in range(disp_cols):
+            if (disp_cols*a + b) < len(plots):
+                I = plots[disp_cols*a + b, :, :, :]
+                if disp_cols*a + b < 4:
+                    out[plot_height * a: plot_height*(a+1), plot_width * b: plot_width*(b+1), :] = I
+                else:
+                    gap = int((plot_width * disp_cols - plot_width * 2) / 2)
+                    out[plot_height * a: plot_height * (a + 1), plot_width * b + gap: plot_width * (b + 1) + gap, :] = I
+    # Image.fromarray(out).show()
+    return out
+
