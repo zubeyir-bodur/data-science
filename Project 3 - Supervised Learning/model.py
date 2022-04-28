@@ -24,12 +24,17 @@ class ANN:
             # Initialize random weights
             self.weights = np.zeros(shape=(num_units, 2))
             # Weights = [w_xh, w_hy, wh]
+            """
             if not self.is_normalized:
                 self.weights[:, 0] = random_weights(num_units)
                 self.weights[:, 1] = random_weights(num_units)
             else:
                 self.weights[:, 0] = 1
                 self.weights[:, 1] = 1
+            """
+            # Pick weights from a gaussian distribution in [0, 1]
+            self.weights[:, 0] = random_weights(num_units)
+            self.weights[:, 1] = random_weights(num_units)
             # Output emitted by the hidden units
             self.h = np.array([(1 / num_units) for _ in range(num_units)])
         else:
@@ -38,7 +43,7 @@ class ANN:
             # which is the slope
             # and a bias value
             self.slope = 1  # Let the initial slope be 1
-            self.bias = 1   # and assume true mean is (0, 0)
+            self.bias = 1   # amd bias be nonzero
 
     def train(self, x_train, y_train):
         losses = [0.0 for _ in range(self.stop_M)]
@@ -46,7 +51,7 @@ class ANN:
             print("Using normalization...")
             # normalize the x and y train values to the interval [0, 1]
             x_train_norm, scaler_x = min_max_scale(x_train)
-            y_train_norm, scaler_y = min_max_scale(y_train)
+            # y_train_norm, scaler_y = min_max_scale(y_train)
         if self.num_units == 0:
             print("Using no hidden layers...")
             for i in range(self.epochs):
@@ -61,11 +66,11 @@ class ANN:
                     loss = (1/2)*((f_of_x - y_train[index]) ** 2)
                 else:
                     f_of_x = x_train_norm[index] * self.slope + self.bias
-                    delta_w = self.learning_rate * (y_train_norm[index] - f_of_x) * x_train_norm[index]
-                    delta_bias = self.learning_rate * (y_train_norm[index] - f_of_x)
+                    delta_w = self.learning_rate * (y_train[index] - f_of_x) * x_train_norm[index]
+                    delta_bias = self.learning_rate * (y_train[index] - f_of_x)
                     self.slope += delta_w
                     self.bias += delta_bias
-                    loss = (1 / 2) * ((f_of_x - y_train_norm[index]) ** 2)
+                    loss = (1 / 2) * ((f_of_x - y_train[index]) ** 2)
                 losses.append(loss)
                 ma_losses = int(np.sum(np.array(losses[-self.stop_M:-1]))) / self.stop_M
 
@@ -99,14 +104,14 @@ class ANN:
                     hx = sigmoid(forward)
                     derivative_sigmoid = sigmoid_der(forward)
                     output = np.dot(hx, self.h)
-                    self.weights[:, 0] += self.learning_rate * (y_train_norm[index] - output) * self.h * derivative_sigmoid
-                    self.weights[:, 1] += self.learning_rate * (y_train_norm[index] - output) * self.h * derivative_sigmoid \
+                    self.weights[:, 0] += self.learning_rate * (y_train[index] - output) * self.h * derivative_sigmoid
+                    self.weights[:, 1] += self.learning_rate * (y_train[index] - output) * self.h * derivative_sigmoid \
                                           * x_train_norm[index]
-                    self.h += self.learning_rate * (y_train_norm[index] - output) * hx
+                    self.h += self.learning_rate * (y_train[index] - output) * hx
                     forward = w0 + x_train_norm.reshape(len(x_train_norm), 1) * w1
                     hx = sigmoid(forward)
                     predictions = np.dot(hx, self.h)
-                    loss = float(np.sum((predictions - y_train_norm) ** 2))
+                    loss = float(np.sum((predictions - y_train) ** 2))
 
                 losses.append(loss)
                 # print(f"Epoch {i}/{self.epochs} -- Loss = {loss}")
@@ -127,11 +132,13 @@ class ANN:
         else:
             w0 = self.bias
             w1 = self.slope
+
         if self.is_normalized:
             print("Using normalization while predicting...")
             # normalize the x and y train values to the interval [0, 1]
             x_test_norm, scaler_x = min_max_scale(x_test)
-            y_test_norm, scaler_y = min_max_scale(y_test)
+            # y_test_norm, scaler_y = min_max_scale(y_test)
+
         if not self.is_normalized:
             forward = w0 + x_test.reshape(len(x_test), 1) * w1
             if self.num_units == 0:
@@ -141,16 +148,11 @@ class ANN:
                 y_pred = np.dot(hx, self.h)
             loss = np.sum((y_pred - y_test) ** 2)
         else:
-            """
-            Perform the prediction in the normalized space
-            Then perform inverse transform
-            """
             forward = w0 + x_test_norm.reshape(len(x_test_norm), 1) * w1
             if self.num_units == 0:
                 y_pred = forward
             else:
                 hx = sigmoid(forward)
                 y_pred = np.dot(hx, self.h)
-            loss = np.sum((y_pred - y_test_norm) ** 2)
-            y_pred = inverse_transform(y_pred, scaler_y)
+            loss = np.sum((y_pred - y_test) ** 2)
         return y_pred, loss

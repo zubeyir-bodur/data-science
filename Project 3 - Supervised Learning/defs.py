@@ -70,7 +70,9 @@ def random_weights(num_units):
 
 def min_max_scale(ndarray):
     """
-    Min max normalization does not work...
+    Min-max normalization meets the needs.
+    However, better approaches can be used
+    such as L1, L2, max-abs, gaussian normalization ...
     :param ndarray:
     :return:
     """
