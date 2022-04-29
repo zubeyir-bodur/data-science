@@ -154,5 +154,6 @@ class ANN:
             else:
                 hx = sigmoid(forward)
                 y_pred = np.dot(hx, self.h)
-            loss = np.sum((y_pred - y_test) ** 2)
+            # Use SSE, but do not sum them for the report...
+            loss = np.array((y_pred - y_test) ** 2)
         return y_pred, loss
