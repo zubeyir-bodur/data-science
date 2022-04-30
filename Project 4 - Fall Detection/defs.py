@@ -89,3 +89,51 @@ def plot_clustered_data(x_norm_reduced, y_predict, n_clusters):
     plt.legend(labels=[f"Cluster {i}" for i in range(n_clusters)])
     plt.title(f"K-Means Visualization of Telehealth Data w/ K={n_clusters}")
 
+
+def find_best_svm(x_train, y_train, x_val, y_val, c_values, kernel_types, degrees, gamma_values):
+    """
+    Compute the best SVM by training
+    Record the training histories to a table
+    :param x_train:
+    :param y_train:
+    :param x_val:
+    :param y_val:
+    :param c_values:
+    :param kernel_types:
+    :param degrees:
+    :param gamma_values:
+    :return:
+    """
+    val_accuracy = 0
+    degree = -1
+    gamma = "todo"
+    for c_ in c_values:
+        for kernel_type in kernel_types:
+            # TODO
+            print("TODO")
+    return c_, kernel_type, degree, gamma, val_accuracy
+
+
+def find_best_mlp(x_train, y_train, x_val, y_val, learning_rates, alphas, solvers, activation_functions="relu"):
+    """
+    Compute the best MLP by training
+    Record the training histories to a table
+    :param x_train:
+    :param y_train:
+    :param x_val:
+    :param y_val:
+    :param learning_rates:
+    :param alphas:
+    :param solvers:
+    :param activation_functions:
+    :return:
+    """
+    val_accuracy = 0
+    for lr in learning_rates:
+        for alpha in alphas:
+            for solver in solvers:
+                for activation_function in activation_functions:
+                    # TODO
+                    print("TODO")
+    return lr, alpha, solver, activation_function, val_accuracy
+
