@@ -69,8 +69,8 @@ def plot_clustered_data(x_norm_reduced, y_predict, n_clusters):
 
     # Colors
     c = ['#00FF00', '#FF0000', '#0000FF', '#F0F000',
-              '#00F0F0', '#F000F0', '#FFA500', '#FFC0CB',
-              '#000000', '#851E1E']
+         '#00F0F0', '#F000F0', '#FFA500', '#FFC0CB',
+         '#000000', '#851E1E']
     for i in range(x_norm_reduced.shape[0]):
         for j in range(n_clusters):
             if j == y_predict[i]:
@@ -90,6 +90,22 @@ def plot_clustered_data(x_norm_reduced, y_predict, n_clusters):
     plt.title(f"K-Means Visualization of Telehealth Data w/ K={n_clusters}")
 
 
+def export_excel(results_sorted, is_svm):
+    """
+    Writes a dictionary into an Excel file
+    :param results_sorted:
+    :param is_svm:
+    :return:
+    """
+    data = pd.DataFrame(results_sorted)
+    if is_svm:
+        writer = pd.ExcelWriter('plots/SVM_validation_results.xlsx')
+    else:
+        writer = pd.ExcelWriter('plots/MLP_validation_results.xlsx')
+    data.to_excel(writer, 'Sheet 1', index=False)
+    writer.save()
+
+
 def find_best_svm(x_train, y_train, x_val, y_val, c_values, kernel_types, degrees, gamma_values):
     """
     Compute the best SVM by training
@@ -104,17 +120,55 @@ def find_best_svm(x_train, y_train, x_val, y_val, c_values, kernel_types, degree
     :param gamma_values:
     :return:
     """
-    val_accuracy = 0
-    degree = -1
-    gamma = "todo"
+    results = []
     for c_ in c_values:
         for kernel_type in kernel_types:
-            # TODO
-            print("TODO")
-    return c_, kernel_type, degree, gamma, val_accuracy
+            for gamma in gamma_values:
+                if kernel_type == "poly":
+                    for degree in degrees:
+                        print(f"\n\nOn the setting c={c_}, kernel={kernel_type}, gamma={gamma}, degree={degree}")
+                        model = SVC(C=c_, kernel=kernel_type, degree=degree,
+                                    gamma=gamma, max_iter=100000, random_state=42)
+                        model.fit(x_train, y_train)
+                        predictions = model.predict(x_val)
+                        val_accuracy = metrics.accuracy_score(y_val, predictions) * 100
+                        row = {'Regularization Parameter': c_,
+                               'Kernel Type': kernel_type,
+                               'Degree': degree,
+                               'Kernel Coefficient': gamma,
+                               'Validation Accuracy (%)': val_accuracy}
+                        results.append(row)
+                        print(row)
+                else:
+                    print(f"\n\nOn the setting c={c_}, kernel={kernel_type}, gamma={gamma}, degree=NULL")
+                    model = SVC(C=c_, kernel=kernel_type, gamma=gamma,
+                                max_iter=100000, random_state=42)
+                    model.fit(x_train, y_train)
+                    predictions = model.predict(x_val)
+                    val_accuracy = metrics.accuracy_score(y_val, predictions) * 100
+                    row = {'Regularization Parameter': c_,
+                           'Kernel Type': kernel_type,
+                           'Degree': "NULL",
+                           'Kernel Coefficient': gamma,
+                           'Validation Accuracy (%)': val_accuracy}
+                    results.append(row)
+                    print(row)
+    results_sorted = sorted(
+        results, key=lambda x: x['Validation Accuracy (%)'], reverse=True)
+    export_excel(results_sorted, is_svm=True)
+    print('\n\nSVM data is written to an Excel file successfully.')
+
+    best_SVM_params = results_sorted[0]
+    c_best = best_SVM_params["Regularization Parameter"]
+    kernel_type_best = best_SVM_params['Kernel Type']
+    degree_best = best_SVM_params['Degree']
+    gamma_value_best = best_SVM_params['Kernel Coefficient']
+    best_val_acc = best_SVM_params['Validation Accuracy (%)']
+    return c_best, kernel_type_best, degree_best, gamma_value_best, best_val_acc
 
 
-def find_best_mlp(x_train, y_train, x_val, y_val, learning_rates, alphas, solvers, activation_functions="relu"):
+def find_best_mlp(x_train, y_train, x_val, y_val, hidden_layer_sizes, learning_rates, alphas, solvers,
+                  activation_functions=["relu"]):
     """
     Compute the best MLP by training
     Record the training histories to a table
@@ -122,18 +176,44 @@ def find_best_mlp(x_train, y_train, x_val, y_val, learning_rates, alphas, solver
     :param y_train:
     :param x_val:
     :param y_val:
+    :param hidden_layer_sizes:
     :param learning_rates:
     :param alphas:
     :param solvers:
     :param activation_functions:
     :return:
     """
-    val_accuracy = 0
-    for lr in learning_rates:
-        for alpha in alphas:
-            for solver in solvers:
-                for activation_function in activation_functions:
-                    # TODO
-                    print("TODO")
-    return lr, alpha, solver, activation_function, val_accuracy
+    results = []
+    for size in hidden_layer_sizes:
+        for lr in learning_rates:
+            for alpha in alphas:
+                for solver in solvers:
+                    for activation_function in activation_functions:
+                        print(f"\n\nOn the setting size={size}, lr={lr}, alpha={alpha}, solver={solver}, act_func={activation_function}")
+                        model = MLPClassifier(hidden_layer_sizes=size, activation=activation_function,
+                                              solver=solver, alpha=alpha, learning_rate_init=lr, max_iter=100000,
+                                              random_state=42)
+                        model.fit(x_train, y_train)
+                        predictions = model.predict(x_val)
+                        val_accuracy = metrics.accuracy_score(y_val, predictions) * 100
+                        row = {"Hidden Layer Size": size,
+                               "Activation Function": activation_function,
+                               "Solver": solver,
+                               "Alpha": alpha,
+                               "Learning Rate": lr,
+                               "Validation Accuracy (%)": val_accuracy}
+                        results.append(row)
+                        print(row)
 
+    results_sorted = sorted(
+        results, key=lambda x: x['Validation Accuracy (%)'], reverse=True)
+    export_excel(results_sorted, is_svm=False)
+    print('MLP data is written to an Excel file successfully.')
+    best_MLP_params = results_sorted[0]
+    size_best = best_MLP_params['Hidden Layer Size']
+    lr_best = best_MLP_params['Learning Rate']
+    alpha_best = best_MLP_params['Alpha']
+    solver_best = best_MLP_params['Solver']
+    activation_function_best = best_MLP_params['Activation Function']
+    best_val_acc = best_MLP_params['Validation Accuracy (%)']
+    return size_best, lr_best, alpha_best, solver_best, activation_function_best, best_val_acc
