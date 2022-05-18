@@ -1,11 +1,9 @@
 import io
 import operator
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 from random import random
 from scipy.interpolate import make_interp_spline
-from sklearn.preprocessing import MinMaxScaler
 from PIL import Image
 
 
@@ -77,13 +75,18 @@ def min_max_scale(ndarray):
     :param ndarray:
     :return:
     """
-    scaler = MinMaxScaler()
-    transformed = scaler.fit_transform(np.transpose(ndarray.reshape(1, -1))).flatten()
+    min_ = np.amin(ndarray)
+    max_ = np.amax(ndarray)
+    scaler = [min_, max_]
+    # transformed = scaler.fit_transform(np.transpose(ndarray.reshape(1, -1))).flatten()
+    transformed = (ndarray - min_) / (max_ - min_)
     return transformed, scaler
 
 
 def inverse_transform(transformed, scaler):
-    return scaler.inverse_transform(np.transpose(transformed.reshape(1, -1))).flatten()
+    [min_, max_] = scaler
+    ndarray = transformed*(max_ - min_) + min_
+    return ndarray
 
 
 def uniques(array):

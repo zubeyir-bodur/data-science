@@ -1,8 +1,3 @@
-import os
-import numpy as np
-import numpy.linalg
-import matplotlib.pyplot as plt
-from random import random
 from defs import *
 
 
